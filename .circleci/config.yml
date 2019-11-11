@@ -1,0 +1,39 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - run:
+          name: Install packages
+          command: sudo apt-get update && sudo apt-get install wget zip unzip -y
+      - run:
+          name: Install awscli
+          command: sudo pip install awscli
+      - run:
+          name: Download packer
+          command: |
+            wget -q https://releases.hashicorp.com/packer/1.4.4/packer_1.4.4_linux_amd64.zip
+            unzip packer*.zip
+            chmod +x packer
+      - run:
+          name: Validate Packer Template
+          command: ./packer validate ami-template.json
+      - run:
+          name: Build AMI
+          command: |
+            ./packer build \
+            -var "aws_region=${AWS_REGION}" \
+            -var "aws_access_key=${AWS_ACCESS_KEY}" \
+            -var "aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+            ami-template.json
+      - deploy:
+          name: conditionally run a deploy job
+          command: |
+            # replace this with your build/deploy check (i.e. current branch is "release")
+            if [[ true ]]; then
+              curl --user ${CIRCLE_API_USER_TOKEN}: \
+                --data build_parameters[CIRCLE_JOB]=build \
+                https://circleci.com/api/v1.1/project/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/tree/${CIRCLE_BRANCH}
+            fi
